@@ -370,22 +370,25 @@ end
 -- Selected record
 function getSelectedRecord()
     local count = 0
+    local index
     
     for i, _ in pairs(input_table["mainlist"]:get_selection()) do
         if count == 0 then
-            return list.items[i]
+            index = i
         end
-        count = 1
-        break
+        count = count + 1
+        if count > 1 then
+            setError("More than one record is selected")
+            return false
+        end
     end
     
     if count == 0 then
         setError("Any record is not selected")
         return false
-    else
-        setError("More than one record is selected")
-        return false
     end
+    
+    return list.items[index]
 end
 
 -- Search by artist
