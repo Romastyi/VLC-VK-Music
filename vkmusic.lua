@@ -325,6 +325,7 @@ end
 function clearSearch()
     input_table["search"]:set_text("")
     input_table["offset"]:set_text(0)
+    input_table["mainlist"]:clear()
     list = nil
     collectgarbage()
     list = {}
