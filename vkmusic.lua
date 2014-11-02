@@ -114,26 +114,29 @@ function interface_main()
     dlg:add_label("<b>Offset:</b>"   , 3,2,1,1)
     dlg:add_label("<b>Search by:</b>", 9,3,1,1);
     dlg:add_label("<b>Play:</b>"     , 9,7,1,1);
+    dlg:add_label("<b>Download:</b>" , 9,10,1,1);
     input_table["search"]  = dlg:add_text_input(config.options.search, 2,1,5,1)
     input_table["where"]   = dlg:add_dropdown(7,1,2,1)
     input_table["count"]   = dlg:add_dropdown(2,2,1,1)
     input_table["offset"]  = dlg:add_text_input(config.options.offset, 4,2,1,1)
     input_table["mainlist"]= dlg:add_list(1,3,8,17)
     input_table["message"] = nil
-    input_table["message"] = dlg:add_label("", 1,20,6,1)
+    input_table["message"] = dlg:add_label("", 1,20,9,1)
     input_table["total"]   = dlg:add_label("", 7,2,1,1)
     dlg:add_button("Search"  , searchAll   , 9,1,1,1)
     dlg:add_button("Clear"   , clearSearch , 9,2,1,1)
     dlg:add_button("Artist"  , searchArtist, 9,4,1,1)
     dlg:add_button("Title"   , searchTitle , 9,5,1,1)
     dlg:add_button("Artist+Title",searchOne, 9,6,1,1)
-    dlg:add_button("Selected", addSelected , 9,8,1,1)
-    dlg:add_button("Add All" , addAllFound , 9,9,1,1)
-    dlg:add_button("< Prev", movePrev, 5,2,1,1)
-    dlg:add_button("Next >", moveNext, 6,2,1,1)
-    dlg:add_button("Help"  , show_help , 7,20,1,1)
-    dlg:add_button("Config", show_conf , 8,20,1,1)
-    dlg:add_button("Close" , deactivate, 9,20,1,1)
+    dlg:add_button("Selected" , addSelected , 9,8,1,1)
+    dlg:add_button("All Found", addAllFound , 9,9,1,1)
+    dlg:add_button("Selected" , downloadSelected, 9,11,1,1)
+    dlg:add_button("All Found", downloadAllFound, 9,12,1,1)
+    dlg:add_button("< Prev", movePrev  , 5,2,1,1)
+    dlg:add_button("Next >", moveNext  , 6,2,1,1)
+    dlg:add_button("Help"  , show_help , 7,21,1,1)
+    dlg:add_button("Config", show_conf , 8,21,1,1)
+    dlg:add_button("Close" , deactivate, 9,21,1,1)
     -- fill dropdowns
     input_table["where"]:add_value("Search everywhere", 1)
     input_table["where"]:add_value("Search in user\'s audio", 2)
@@ -145,16 +148,29 @@ end
 
 -- Interface of config dialog
 function interface_conf()
-	dlg:add_label("<b>Auth request:</b>", 1,1,1,1)
+	dlg:add_label("<b>Auth request:</b>"   , 1,1,1,1)
 	dlg:add_label("<a href=\""..auth_url.."\">Click Here...</a>", 2,1,1,1)
-	dlg:add_label("<b>Access token:</b>", 1,2,1,1)
-	dlg:add_label("<b>User ID:</b>", 1,3,1,1)
-	input_table["token"]  = dlg:add_text_input(config.options.token, 2,2,3,1)
-	input_table["userId"] = dlg:add_text_input(config.options.userId, 2,3,3,1)
+	dlg:add_label("<b>Access token:</b>"   , 1,2,1,1)
+	dlg:add_label("<b>User ID:</b>"        , 1,3,1,1)
+    if config.options.folder then
+        if config.os == "win" then
+            dlg:add_label("<a href='file:///"..config.options.folder.."'>Download folder:</a>", 1,4,1,1)
+        else
+            dlg:add_label("<a href='"..config.options.folder.."'>Download folder:</a>", 1,4,1,1)
+        end
+    else
+        dlg:add_label("<b>Download folder:</b>", 1,4,1,1)
+    end
+	input_table["token"]  = dlg:add_text_input(config.options.token , 2,2,7,1)
+	input_table["userId"] = dlg:add_text_input(config.options.userId, 2,3,7,1)
+	input_table["folder"] = dlg:add_text_input(config.options.folder, 2,4,7,1)
+	-- something strange with position of checkbox?
+	input_table["dir_for_artist"] = dlg:add_check_box("Create new folder for each artist", 1,3,6,2)
+	input_table["dir_for_artist"]:set_checked(config.options.dir_for_artist)
     input_table["message"] = nil
-    input_table["message"] = dlg:add_label("", 1,4,3,1)
-	dlg:add_button("Cancel", show_main, 3,5,1,1)
-	dlg:add_button("Save"  , apply_config, 4,5,1,1)
+    input_table["message"] = dlg:add_label("", 1,7,4,1)
+	dlg:add_button("Cancel", show_main   , 7,7,1,1)
+	dlg:add_button("Save"  , apply_config, 8,7,1,1)
 end
 
 -- Interface of help dialog 
@@ -263,15 +279,11 @@ function getOffset()
             setError("Offset must be a number!")
             input_table["offset"]:set_text(0)
             o = 0
-        end
-        
-        if o < 0 then
+        elseif o < 0 then
             setError("Offset must be greater than 0")
             input_table["offset"]:set_text(0)
             o = 0
-        end
-        
-        if o > 1000 then
+        elseif o > 1000 then
             setError("Offset must be less than 1000")
             input_table["offset"]:set_text(1000)
             o = 1000
@@ -358,24 +370,22 @@ end
 -- Selected record
 function getSelectedRecord()
     local count = 0
-    local first = 1
     
     for i, _ in pairs(input_table["mainlist"]:get_selection()) do
-        count = count + 1
-        first = i
+        if count == 0 then
+            return list.items[i]
+        end
+        count = 1
+        break
     end
     
     if count == 0 then
         setError("Any record is not selected")
         return false
-    end
-    
-    if count > 1 then
+    else
         setError("More than one record is selected")
         return false
     end
-    
-    return list.items[first]
 end
 
 -- Search by artist
@@ -488,31 +498,38 @@ end
 
 -- Add selected records to playlist
 function addSelected()
-    local selected = input_table["mainlist"]:get_selection()
-    
-    if not selected then
-        setError("Any record is not selected")
-        return false
-    end
-    
     local records = {}
+    local count = 0
     
-    for i, _ in pairs(selected) do
+    for i, _ in pairs(input_table["mainlist"]:get_selection()) do
         table.insert(records, newRecord(list.items[i]))
+        count = count + 1
     end
 
-    vlc.playlist.enqueue(records)
+    if count == 0 then
+        setError("Where is nothing to add")
+    else
+        vlc.playlist.enqueue(records)
+        setMessage(success_tag(count.." records were added"))
+    end
 end
 
 -- Add all founded records
 function addAllFound()
     local records = {}
+    local count = 0
     
     for _, item in pairs(list.items) do
         table.insert(records, newRecord(item))
+        count = count + 1
     end
 
-    vlc.playlist.enqueue(records)
+    if count == 0 then
+        setError("Where is nothing to add")
+    else
+        vlc.playlist.enqueue(records)
+        setMessage(success_tag(count.." records were added"))
+    end
 end
 
 -- Parse music list
@@ -602,24 +619,126 @@ function search_music( token, str, offset, count, search_own, auto_complete )
     return parse_music_list(r)
 end
 
+-- Download records
+function downloadRecord(item)
+    if item == nil or item.url == "" then
+        setError("Where is nothing to download")
+        return false
+    end
+
+    local folder = config.options.folder
+    local filename = item.title..".mp3"
+    if item.artist ~= "" then
+        if config.options.dir_for_artist then
+            folder = folder..slash..item.artist
+        else
+            filename = item.artist.." - "..filename
+        end
+    end
+    local target = folder..slash..filename
+
+    vlc.msg.dbg("[VK Music] Downloading ulr to file \""..target.."\"...")
+    setMessage("Downloading to file \""..filename.."\"...")
+    -- if file already exists
+    if file_exists(target) then
+        setMessage(success_tag("File \""..filename.."\" already exists"))
+        return true
+    end
+    -- Determine if the path to the audio file is accessible for writing
+    if not is_dir(folder) then
+        mkdir_p(folder)
+    end
+    if not file_touch(target) then
+        setError("Could not create file \""..target.."\"")
+        return false
+    end
+    -- Downlaod data into file
+    local stream = vlc.stream(item.url)
+    local data = ""
+    local file = io.open(target, "wb")
+    while data do
+        file:write(data)
+        data = stream:read(65536)
+    end
+    file:flush()
+    file:close()
+    stream = nil
+    collectgarbage()
+
+    setMessage(success_tag("Downloading to file \""..filename.."\"... Finished"))
+    vlc.msg.dbg("[VK Music] Downloading ulr to file \""..target.."\"... Finished")
+    return true
+end
+
+-- Download selected records
+function downloadSelected()
+    local count = 0
+    
+    for i, _ in pairs(input_table["mainlist"]:get_selection()) do
+        if downloadRecord(list.items[i]) then
+            count = count + 1
+        end
+    end
+    
+    if count == 0 then
+        setError("Where is nothing to download")
+    else
+        local dir = config.options.folder
+        if config.os == "win" then
+            dir = "<a href='file:///"..dir.."'>"..dir.."</a>"
+        else
+            dir = "<a href='"..dir.."'>"..dir.."</a>"
+        end
+        setMessage(success_tag(count.." records were downloaded in \""..dir.."\""))
+    end
+end
+
+-- Download all found records
+function downloadAllFound()
+    local count = 0
+    
+    for _, item in pairs(list.items) do
+        if downloadRecord(item) then
+            count = count + 1
+        end
+    end
+    
+    if count == 0 then
+        setError("Where is nothing to download")
+    else
+        local dir = config.options.folder
+        if config.os == "win" then
+            dir = "<a href='file:///"..dir.."'>"..dir.."</a>"
+        else
+            dir = "<a href='"..dir.."'>"..dir.."</a>"
+        end
+        setMessage(success_tag(count.." records were downloaded in \""..dir.."\""))
+    end
+end
+
 -- Configurations
 function check_config()
     json_init()
 
     if is_windows_path(vlc.config.datadir()) then
+        config.os = "win"
         slash = "\\"
     else
+        config.os = "*nix"
         slash = "/"
     end
     
     config.file = vlc.config.configdir()..slash.."vkmusic.conf"
     config.options = {}
     
-    if file_exists(config.file) then
-        load_config()
-    elseif not file_touch(config.file) then
+    if not file_exists(config.file) and not file_touch(config.file) then
         vlc.msg.dbg("[VK Music] Permission denied for \""..config.file.."\"")
         return false
+    else
+        if not load_config() then
+            vlc.msg.dbg("[VK Music] Could not load config from \""..config.file.."\"")
+            return false
+        end
     end
     
     return true
@@ -633,12 +752,18 @@ function load_config()
     f:flush()
     f:close()
     f = nil
-    local obj, _, err = json.decode(content)
-    if err then return false end
-    config.options = obj
+    if content ~= "" then
+        local obj, _, err = json.decode(content)
+        if err then return false end
+        config.options = obj
+    end
     if not config.options.search then config.options.search = "" end
-    if not config.options.count then config.options.count = 100 end
-    if not config.options.offset then config.options.offset = "0" end
+    if not config.options.count  then config.options.count = 100 end
+    if not config.options.offset then config.options.offset =  0 end
+    if not config.options.folder then config.options.folder = vlc.config.userdatadir() end
+    if config.options.dir_for_artist == nil then
+        config.options.dir_for_artist = true
+    end
     collectgarbage()
     return true
 end
@@ -661,20 +786,41 @@ end
 function apply_config()
     local new_token = input_table["token"]:get_text()
     local new_userId = input_table["userId"]:get_text()
+    local new_folder = input_table["folder"]:get_text()
+    config.options.dir_for_artist = input_table["dir_for_artist"]:get_checked()
     
     -- check new token
-    if not search_music(new_token, nil, nil, 1) then
-        return false
+    if new_token ~= config.options.token then
+        if not search_music(new_token, nil, nil, 1) then
+            setError("Invalid access token")
+            return false
+        end
+        config.options.token = new_token
     end
-    config.options.token = new_token
     
     -- check new userId
-    if not get_music(new_token, new_userId, nil, nil, nil, 1) then
-        return false
+    if new_userId ~= config.options.userId then
+        if not get_music(new_token, new_userId, nil, nil, nil, 1) then
+            setError("Invalid user ID")
+            return false
+        end
+        config.options.userId = new_userId
     end
-    config.options.userId = new_userId
+    
+    -- check download folder
+    if new_folder ~= config.options.folder then
+        if not is_dir(new_folder) then
+            if file_exists(new_folder) then
+                setError("Invalid path (file path specified)")
+                return false
+            end
+            mkdir_p(new_folder)
+        end
+        config.options.folder = new_folder
+    end
     
     if not save_config() then
+        setError("Could not save config file")
         return false
     end
     
@@ -708,6 +854,37 @@ function file_exists(name) -- test readability
         return true 
     else 
         return false 
+    end
+end
+
+function is_dir(path)
+    if not path or trim(path) == "" then 
+        return false 
+    end
+    -- Remove slash at the end or it won't work on Windows
+    path = string.gsub(path, "^(.-)[\\/]?$", "%1")
+    local f, _, code = io.open(path, "rb")
+    if f then
+        _, _, code = f:read("*a")
+        f:close()
+        if code == 21 then
+            return true
+        end
+    elseif code == 13 then
+        -- permission denied
+        return true 
+    end
+    return false
+end
+
+function mkdir_p(path)
+    if not path or trim(path) == "" then 
+        return false 
+    end
+    if config.os == "win" then
+        os.execute('mkdir "' .. path..'"')
+    elseif config.os == "*nix" then
+        os.execute("mkdir -p '" .. path.."'")
     end
 end
 
