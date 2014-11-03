@@ -34,6 +34,13 @@ local input_table = {} -- input widgets by id
 local config = {}      -- global configuration
 local list = {}        -- list of searched records
 local page_size = {10, 50, 100, 200, 300}
+local abort = false
+
+-- ID of dialogs
+local search_id = 1
+local download_id = 2
+local config_id = 3
+local help_id = 4
 
 function descriptor()
 	return {
@@ -61,13 +68,8 @@ function activate()
 end
 
 function deactivate()
-    save_interface()
-    
     vlc.msg.dbg("[VK Music] Goodbye!")
-    
-    if dlg then
-        dlg:hide()
-    end
+    close_dlg()
 end
 
 function close()
@@ -75,7 +77,7 @@ function close()
 end
 
 function menu()
-    return { "Research", "Config", "Help" }
+    return { "Research", "Download", "Config", "Help" }
 end
 
 -- initialization of json
@@ -173,6 +175,13 @@ function interface_conf()
 	dlg:add_button("Save"  , apply_config, 8,7,1,1)
 end
 
+-- Interface of download dialog
+function interface_download()
+    input_table["message"] = nil
+    input_table["message"] = dlg:add_label("", 1,1,9,1)
+    dlg:add_button("Abort", abortDownload, 5,2,1,1)
+end
+
 -- Interface of help dialog 
 function interface_help()
     dlg:add_html("", 1,1,3,1)
@@ -181,15 +190,17 @@ end
 
 -- show dialog by id
 function trigger_menu(dlg_id)
-    if dlg_id == 1 then
+    if dlg_id == search_id then -- Research
         close_dlg()
         dlg = vlc.dialog("Music Search")
         interface_main()
-    elseif dlg_id == 2 then
+    elseif dlg_id == download_id then -- Download
+        downloadPlaylist()
+    elseif dlg_id == config_id then -- Config
         close_dlg()
         dlg = vlc.dialog("Configuration")
         interface_conf()
-    elseif dlg_id == 3 then
+    elseif dlg_id == help_id then -- Help
         close_dlg()
         dlg = vlc.dialog("Help")
         interface_help()
@@ -198,19 +209,20 @@ function trigger_menu(dlg_id)
 end
 
 function show_main()
-    trigger_menu(1)
+    trigger_menu(search_id)
 end
 
 function show_conf()
-    trigger_menu(2)
+    trigger_menu(config_id)
 end
 
 function show_help()
-    trigger_menu(3)
+    trigger_menu(help_id)
 end
 
 -- Close current dialog
 function close_dlg()
+    abort = true
     save_interface()
     
     vlc.msg.dbg("[VK Music] Closing dialog")
@@ -659,18 +671,25 @@ function downloadRecord(item)
     local stream = vlc.stream(item.url)
     local data = ""
     local file = io.open(target, "wb")
-    while data do
+    abort = false
+    while not abort and data do
         file:write(data)
         data = stream:read(65536)
+--        vlc.misc.mwait(vlc.misc.mdate() + 1000)
     end
     file:flush()
     file:close()
+    if abort then os.remove(target) end
     stream = nil
     collectgarbage()
 
     setMessage(success_tag("Downloading to file \""..filename.."\"... Finished"))
     vlc.msg.dbg("[VK Music] Downloading ulr to file \""..target.."\"... Finished")
     return true
+end
+
+function abortDownload()
+    abort = true
 end
 
 -- Download selected records
@@ -716,6 +735,32 @@ function downloadAllFound()
             dir = "<a href='"..dir.."'>"..dir.."</a>"
         end
         setMessage(success_tag(count.." records were downloaded in \""..dir.."\""))
+    end
+end
+
+-- Download from playlist
+function downloadPlaylist()
+    local input = vlc.input.item()
+    
+    if input then
+        local metas = input:metas()
+        local dlg_created = false
+        if dlg == nil then
+            local title = metas.title
+            if metas.artist ~= "" then
+                title = metas.artist.." - "..title
+            end
+            dlg = vlc.dialog("Downloading \""..title.."\"...")
+            interface_download()
+            dlg_created = true
+        end
+        local is_playing = vlc.input.is_playing()
+        if is_playing then vlc.playlist.pause() end
+        downloadRecord({ url = input:uri(), artist = metas.artist, title = metas.title })
+        if is_playing then vlc.playlist.play() end
+        if dlg_created then close_dlg() end
+    else
+        setError("Where is nothing to download")
     end
 end
 
