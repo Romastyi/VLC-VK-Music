@@ -26,7 +26,7 @@ local apiVersion = "5.25"
 local appId = 4605667
 
 local auth_url = "https://oauth.vk.com/authorize?client_id="..appId..
-                 "&scope=audio&redirect_uri=https://oauth.vk.com/blank.html&display=page&v="..apiVersion..
+                 "&scope=audio,offline&redirect_uri=https://oauth.vk.com/blank.html&display=page&v="..apiVersion..
                  "&response_type=token"
 
 local dlg = nil        -- dialog
