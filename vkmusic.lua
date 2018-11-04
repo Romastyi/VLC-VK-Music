@@ -611,6 +611,7 @@ function get_music( token, owner_id, album_id, audio_ids, offset, count )
     end
     if offset then url = url.."offset="..offset.."&" end
     if count then url = url.."count="..count.."&" end
+    url = url.."v="..apiVersion.."&"
     -- access token
     url = url.."access_token="..token
     local r = json.parse_url(url)
@@ -623,11 +624,12 @@ end
 function search_music( token, str, offset, count, search_own, auto_complete )
     local url = "https://api.vk.com/method/audio.search?"
     -- request params
-    if str then url = url.."q="..str.."&" end
+    url = url.."q=&"
     if offset then url = url.."offset="..offset.."&" end
     if count then url = url.."count="..count.."&" end
     if search_own then url = url.."search_own=1&" end
     if auto_complete then url = url.."auto_complete=1&" end
+    url = url.."v="..apiVersion.."&"
     -- access token
     url = url.."access_token="..token
     local r = json.parse_url(url)
